@@ -44,10 +44,12 @@ export class HydrationRenderer extends DomRenderer {
 
   createElement(parent: Element|DocumentFragment, name: string, debugInfo: RenderDebugInfo):
       Element {
-        console.log('createElement', debugInfo);
+        console.log('createElement', debugInfo, (new Error()).stack);
     let el: Element;
+    let hydrated = false;
     if (existingElement(parent, name, this.preservationAttribute)) {
       el = getExistingElement(parent, name);
+      hydrated = true;
     } else if (isNamespaced(name)) {
       const nsAndName = splitNamespace(name);
       el = document.createElementNS((NAMESPACE_URIS)[nsAndName[0]], nsAndName[1]);
@@ -57,10 +59,48 @@ export class HydrationRenderer extends DomRenderer {
     // if (this._contentAttr) {
     //   el.setAttribute(this._contentAttr, '');
     // }
-    if (parent) {
+    if (parent && !hydrated) {
       parent.appendChild(el);
     }
     return el;
+  }
+
+  // createText(parentElement: Element|DocumentFragment, value: string, debugInfo: RenderDebugInfo):
+  //     any {
+  //       // TODO: get relative order of nodes
+  //       if (parentElement.childNodes) {
+
+  //       }
+  //   const node = document.createTextNode(value);
+  //   if (parentElement) {
+  //     parentElement.appendChild(node);
+  //   }
+  //   return node;
+  // }
+
+  setElementAttribute(renderElement: Element, attributeName: string, attributeValue: string): void {
+    let attrNs: string;
+    let attrNameWithoutNs = attributeName;
+    if (isNamespaced(attributeName)) {
+      const nsAndName = splitNamespace(attributeName);
+      attrNameWithoutNs = nsAndName[1];
+      attributeName = nsAndName[0] + ':' + nsAndName[1];
+      attrNs = NAMESPACE_URIS[nsAndName[0]];
+    }
+    if (isPresent(attributeValue)) {
+      if (attrNs) {
+        renderElement.setAttributeNS(attrNs, attributeName, attributeValue);
+      } else if(attributeValue !== renderElement.getAttribute(attributeName)) {
+        // Added conditional to make sure attribute value isn't the same
+        renderElement.setAttribute(attributeName, attributeValue);
+      }
+    } else {
+      if (isPresent(attrNs)) {
+        renderElement.removeAttributeNS(attrNs, attrNameWithoutNs);
+      } else {
+        renderElement.removeAttribute(attributeName);
+      }
+    }
   }
 }
 
@@ -86,12 +126,21 @@ function existingElement(parent: Element | DocumentFragment, name: string, attr:
 }
 
 function removeUnPreservedChildren(root: Element, attr: string, isRoot?: boolean) {
-  console.log('running on root');
+  if (isRoot) console.log('running on root');
   // We don't want to destroy the root element
   if (isRoot || root.attributes.getNamedItem(attr)) {
     console.log('we have a match!', root);
     if (root.children) {
       Array.prototype.forEach.call(root.children, el => removeUnPreservedChildren(el, attr, false));
+    }
+    if (root.childNodes) {
+      Array.prototype.filter.call(root.childNodes, (node) => {
+        return node instanceof Text;
+      })
+      .forEach(n => {
+        // Just remove each text node
+        root.removeChild(n);
+      });
     }
   } else {
     console.log('we have a loser', root);
@@ -101,4 +150,8 @@ function removeUnPreservedChildren(root: Element, attr: string, isRoot?: boolean
   }
 
   return root;
+}
+
+export function isPresent(obj: any): boolean {
+  return obj != null;
 }

@@ -13,7 +13,14 @@
     <h1 ngPreserveNode>
       app works prerendered!
     </h1>
-    <div >Child 1</div><div>Child 2</div>
+    <div ngPreserveNode>
+      <div ngPreserveNode>
+        <div ngPreserveNode>
+          <iframe ngPreserveNode src="assets/iframe.html"></iframe>
+        </div>
+      </div>
+    </div>
+
   </app-root>
 </body>
 </html>
